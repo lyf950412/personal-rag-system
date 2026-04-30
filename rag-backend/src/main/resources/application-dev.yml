@@ -1,0 +1,87 @@
+# 开发环境配置
+spring:
+  # 数据源 - 使用PostgreSQL（包含pgvector扩展）
+  datasource:
+    url: jdbc:postgresql://118.196.49.115:5432/mydatabase?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=Asia/Shanghai
+    username: postgres
+    password: lyf123456
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+
+  # JPA配置
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+        use_sql_comments: true
+        batch_size: 20
+        fetch_size: 100
+        order_insert: true
+        order_update: true
+  # Spring AI 配置
+  ai:
+    openai:
+      api-key: ${OPENAI_API_KEY}
+      base-url: ${OPENAI_BASE_URL}
+      chat:
+        model: ${AI_MODEL}
+        completionsPath: /chat/completions
+        temperature: 0.7
+        maxTokens: 2000
+    volcengine:
+      api-key: ${VOLCENGINE_API_KEY:your-volcengine-api-key}
+      base-url: https://ark.cn-beijing.volces.com/api/v3
+      model: ${EMBEDDING_MODEL:doubao-embedding-vision-250615}
+      dimensions: ${EMBEDDING_DIMENSIONS:1536}
+      encoding-format: float
+      text-instruction: 为这个文本生成向量表示
+# 日志
+logging:
+  level:
+    root: INFO
+    com.rag: DEBUG
+    org.springframework: INFO
+    org.hibernate: INFO
+    org.springframework.ai: DEBUG
+    org.springframework.web.client: TRACE
+    org.springframework.http.converter.json: DEBUG
+    org.springframework.web.reactive.function.client: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+# API文档
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui.html
+    tags-sorter: alpha
+    operations-sorter: alpha
+# CORS配置
+cors:
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173}
+  allowed-methods: GET,POST,PUT,DELETE,OPTIONS
+  max-age: 3600
+
+# JWT配置
+jwt:
+  secret: ${JWT_SECRET:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+  expiration: ${JWT_EXPIRATION:86400000}
+
+# AI对话配置
+ai:
+  chat:
+    max-history-size: 100
+    session-timeout: 86400
+  rag:
+    retrieval:
+      top-k: 5

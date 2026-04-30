@@ -1,0 +1,5 @@
+export { dashboardApi } from './dashboard'
+export { knowledgeBaseApi } from './knowledgeBase'
+export { documentApi } from './document'
+export { chatApi } from './chat'
+export { configApi } from './config'

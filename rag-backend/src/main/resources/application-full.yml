@@ -1,0 +1,96 @@
+# RAG知识库系统 - 完整配置
+
+spring:
+  application:
+    name: rag-backend
+  
+  # 数据源
+  datasource:
+    url: jdbc:h2:mem:rag_db
+    username: sa
+    password: 
+    driver-class-name: org.h2.Driver
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+  
+  # JPA配置
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        use_sql_comments: true
+        batch_size: 20
+        fetch_size: 100
+        order_insert: true
+        order_update: true
+  
+  # H2控制台
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+  
+  # 文件上传
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 500MB
+      max-request-size: 500MB
+      file-size-threshold: 10MB
+
+# 服务器配置
+server:
+  port: 8080
+  compression:
+    enabled: true
+    mime-types: application/json,application/xml,text/html,text/plain
+    min-response-size: 1024
+
+# 日志配置
+logging:
+  level:
+    root: INFO
+    com.rag: DEBUG
+    org.springframework: INFO
+    org.hibernate: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+  file:
+    name: logs/rag-backend.log
+    max-size: 10MB
+    max-history: 30
+
+# API文档
+springdoc:
+  api-docs:
+    enabled: true
+    path: /v3/api-docs
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui.html
+    tags-sorter: alpha
+    operations-sorter: alpha
+
+# RAG应用配置
+rag:
+  upload:
+    path: uploads/
+    max-size: 524288000
+    allowed-types: PDF,DOCX,DOC,TXT,MD,PNG,JPG,JPEG,GIF,MP3,WAV,AAC,MP4,AVI,MOV
+  chat:
+    max-history: 100
+    session-timeout: 3600
+  vector:
+    dimension: 768
+    top-k: 5
+    similarity-threshold: 0.7
+  rate-limit:
+    general: 60
+    chat: 10

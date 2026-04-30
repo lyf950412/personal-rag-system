@@ -1,0 +1,16 @@
+# application.yml 完整配置
+
+# 应用配置
+spring:
+  application:
+    name: rag-backend
+  profiles:
+    active: dev
+  # 文件上传
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 500MB
+      max-request-size: 500MB
+      file-size-threshold: 10MB
+

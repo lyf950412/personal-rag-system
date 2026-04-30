@@ -1,0 +1,44 @@
+# Git
+.git
+.gitignore
+
+# IDE
+.idea
+.vscode
+*.iml
+
+# Build outputs
+dist/
+build/
+
+# Logs
+*.log
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Dependencies
+node_modules/
+
+# Test files
+*.test.js
+*.spec.js
+coverage/
+
+# Documentation
+*.md
+
+# Docker
+Dockerfile
+docker-compose*.yml
+.dockerignore
+nginx.conf
+
+# Source files (only need built output)
+src/

@@ -1,0 +1,68 @@
+.container {
+  padding: 8px;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.title {
+  font-size: 20px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.settingsLayout {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 16px;
+}
+
+.settingsCard {
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.tabs {
+  min-height: 500px;
+}
+
+.form {
+  max-width: 600px;
+  padding-top: 8px;
+}
+
+.actionCard {
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  height: fit-content;
+}
+
+.actionTitle {
+  font-size: 16px;
+  font-weight: 500;
+  margin-bottom: 16px;
+}
+
+.actionList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.actionButton {
+  border-radius: 8px;
+}
+
+@media (max-width: 1024px) {
+  .settingsLayout {
+    grid-template-columns: 1fr;
+  }
+  
+  .actionCard {
+    order: -1;
+  }
+}

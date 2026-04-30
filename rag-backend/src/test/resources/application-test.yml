@@ -1,0 +1,34 @@
+# 测试环境配置
+
+spring:
+  datasource:
+    url: jdbc:h2:mem:test_db
+    username: sa
+    password: 
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+  h2:
+    console:
+      enabled: false
+
+logging:
+  level:
+    root: INFO
+    com.rag: DEBUG
+    org.springframework.web: DEBUG
+    org.hibernate: SQL
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+  pattern:
+    console: "%d{HH:mm:ss} %5p %m%n"
+
+springdoc:
+  swagger-ui:
+    enabled: false
+    api-docs:
+      enabled: false

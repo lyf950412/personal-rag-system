@@ -1,0 +1,177 @@
+.container {
+  padding: 8px;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.title {
+  font-size: 20px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.alert {
+  margin-bottom: 16px;
+  border-radius: 8px;
+}
+
+.uploadCard {
+  margin-bottom: 16px;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.uploadHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.uploadTitle {
+  font-size: 16px;
+  font-weight: 500;
+  margin: 0;
+}
+
+.kbSelect {
+  min-width: 200px;
+}
+
+.dragger {
+  padding: 40px 20px;
+  border-radius: 12px;
+}
+
+.formatGuide {
+  margin-top: 24px;
+}
+
+.guideTitle {
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 12px;
+}
+
+.formatCard {
+  text-align: center;
+  border-radius: 8px;
+  height: 100%;
+}
+
+.formatIcon {
+  font-size: 32px;
+  margin-bottom: 8px;
+}
+
+.formatType {
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+
+.formatList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  justify-content: center;
+  margin-bottom: 8px;
+}
+
+.formatTag {
+  margin: 0;
+  font-size: 11px;
+}
+
+.maxSize {
+  font-size: 12px;
+  color: #8c8c8c;
+}
+
+.historyCard {
+  margin-bottom: 16px;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.fileList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.fileItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: #fafafa;
+  border-radius: 8px;
+  transition: background 0.2s;
+}
+
+.fileItem:hover {
+  background: #f0f0f0;
+}
+
+.fileInfo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.fileDetails {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.fileName {
+  font-weight: 500;
+}
+
+.fileMeta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #8c8c8c;
+}
+
+.fileStatus {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.processCard {
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.steps {
+  padding: 16px 0;
+}
+
+@media (max-width: 768px) {
+  .uploadHeader {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  
+  .kbSelect {
+    width: 100%;
+  }
+  
+  .fileItem {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+}

@@ -1,0 +1,281 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 128px);
+  max-height: calc(100vh - 128px);
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #f0f0f0;
+  margin-bottom: 16px;
+}
+
+.headerLeft {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.title {
+  font-size: 20px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.headerRight {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.kbSelect {
+  min-width: 150px;
+}
+
+.messagesContainer {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 0;
+}
+
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  text-align: center;
+  color: #8c8c8c;
+}
+
+.emptyIcon {
+  font-size: 64px;
+  color: #d9d9d9;
+  margin-bottom: 16px;
+}
+
+.emptyState h3 {
+  font-size: 18px;
+  color: #1f1f1f;
+  margin-bottom: 8px;
+}
+
+.emptyState p {
+  font-size: 14px;
+  margin-bottom: 24px;
+}
+
+.suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+
+.suggestionTag {
+  cursor: pointer;
+  padding: 8px 16px;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.suggestionTag:hover {
+  background: #e6f4ff;
+  border-color: #1677ff;
+  color: #1677ff;
+}
+
+.message {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 24px;
+  padding: 0 8px;
+}
+
+.userMessage {
+  flex-direction: row-reverse;
+}
+
+.avatar {
+  flex-shrink: 0;
+}
+
+.messageContent {
+  max-width: 70%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.userMessage .messageContent {
+  align-items: flex-end;
+}
+
+.messageBubble {
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: #f5f5f5;
+  word-break: break-word;
+}
+
+.userMessage .messageBubble {
+  background: #1677ff;
+  color: white;
+}
+
+.messageText {
+  white-space: pre-wrap;
+  line-height: 1.6;
+  animation: fadeIn 0.15s ease-in;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0.7;
+    transform: translateY(1px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.sources {
+  background: #fafafa;
+  border-radius: 8px;
+  border: 1px solid #f0f0f0;
+}
+
+.sourceItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.sourceItem:last-child {
+  border-bottom: none;
+}
+
+.sourceIcon {
+  color: #1677ff;
+}
+
+.sourceTitle {
+  flex: 1;
+  font-size: 13px;
+}
+
+.sourceScore {
+  font-size: 12px;
+  color: #8c8c8c;
+}
+
+.messageActions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  color: #8c8c8c;
+}
+
+.userMessage .messageActions {
+  flex-direction: row-reverse;
+}
+
+.actionButtons {
+  display: flex;
+  gap: 4px;
+}
+
+.loadingText {
+  margin-left: 8px;
+  color: #8c8c8c;
+}
+
+.inputArea {
+  border-top: 1px solid #f0f0f0;
+  padding-top: 16px;
+}
+
+.inputTools {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.inputWrapper {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+.textarea {
+  flex: 1;
+  border-radius: 12px;
+  padding: 12px 16px;
+  resize: none;
+}
+
+.sendButton {
+  height: 40px;
+  border-radius: 12px;
+  padding: 0 20px;
+}
+
+.inputHint {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #8c8c8c;
+  margin-top: 8px;
+}
+
+@media (max-width: 768px) {
+  .messageContent {
+    max-width: 85%;
+  }
+  
+  .headerRight {
+    flex-wrap: wrap;
+  }
+}
+
+.errorBanner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: #fff2e8;
+  border: 1px solid #ffbb96;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  color: #d4380d;
+}
+
+.errorBanner span {
+  flex: 1;
+}
+
+.streamingCursor {
+  display: inline-block;
+  margin-left: 2px;
+  animation: blink 0.8s ease-in-out infinite;
+  color: #1677ff;
+}
+
+@keyframes blink {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.3;
+    transform: scale(0.8);
+  }
+}

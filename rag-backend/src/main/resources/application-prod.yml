@@ -1,0 +1,102 @@
+# 生产环境配置
+spring:
+  # 数据源 - 使用PostgreSQL（包含pgvector扩展）
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:postgres}:${DB_PORT:5432}/${DB_NAME:rag_db}?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=Asia/Shanghai
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 50
+      minimum-idle: 10
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+
+  # JPA配置
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: false
+        batch_size: 50
+        fetch_size: 100
+
+  # 文件上传
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 500MB
+      max-request-size: 500MB
+      file-size-threshold: 10MB
+
+  # Spring AI 配置
+  ai:
+    openai:
+      api-key: ${OPENAI_API_KEY}
+      base-url: ${OPENAI_BASE_URL:https://api.openai.com/v1}
+      chat:
+        model: ${AI_MODEL:gpt-4o-mini}
+        completionsPath: /chat/completions
+        temperature: 0.7
+        maxTokens: 2000
+    volcengine:
+      api-key: ${VOLCENGINE_API_KEY:}
+      base-url: ${VOLCENGINE_BASE_URL:https://ark.cn-beijing.volces.com/api/v3}
+      model: ${EMBEDDING_MODEL:doubao-embedding-vision-250615}
+      dimensions: ${EMBEDDING_DIMENSIONS:1536}
+      encoding-format: float
+      text-instruction: 为这个文本生成向量表示
+
+# 日志
+logging:
+  level:
+    root: WARN
+    com.rag: INFO
+    org.springframework: INFO
+    org.hibernate: WARN
+    org.springframework.ai: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+  file:
+    name: /var/log/rag-backend/application.log
+    max-size: 100MB
+    max-history: 30
+
+# API文档
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: false
+
+# CORS配置
+cors:
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}
+  allowed-methods: GET,POST,PUT,DELETE,OPTIONS
+  max-age: 3600
+
+# JWT配置
+jwt:
+  secret: ${JWT_SECRET}
+  expiration: ${JWT_EXPIRATION:86400000}
+
+# AI对话配置
+ai:
+  chat:
+    max-history-size: 100
+    session-timeout: 86400
+  rag:
+    retrieval:
+      top-k: 5
+
+# 服务配置
+server:
+  port: ${SERVER_PORT:8022}
+  compression:
+    enabled: true
+    mime-types: application/json,application/xml,text/html,text/xml,text/plain
+    min-response-size: 1024
