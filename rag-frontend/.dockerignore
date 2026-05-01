@@ -38,7 +38,3 @@ coverage/
 Dockerfile
 docker-compose*.yml
 .dockerignore
-nginx.conf
-
-# Source files (only need built output)
-src/

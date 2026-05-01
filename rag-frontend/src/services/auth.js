@@ -1,7 +1,7 @@
 import axios from 'axios'
 import { message } from 'antd'
 
-const API_BASE_URL = 'http://localhost:8080/api'
+const API_BASE_URL = '/api'
 
 const authApi = axios.create({
   baseURL: API_BASE_URL,
