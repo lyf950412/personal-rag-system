@@ -14,15 +14,17 @@ FROM eclipse-temurin:17-jre-alpine
 
 WORKDIR /app
 
+# Create uploads directory as root
+RUN mkdir -p /app/uploads
+
 # Add non-root user for security
 RUN addgroup -S ragapp && adduser -S ragapp -G ragapp
-USER ragapp
+RUN chown -R ragapp:ragapp /app/uploads
 
 # Copy the built jar
 COPY --from=builder /app/target/*.jar app.jar
 
-# Create uploads directory
-RUN mkdir -p /app/uploads && chown -R ragapp:ragapp /app/uploads
+USER ragapp
 
 # Expose port
 EXPOSE 8080
