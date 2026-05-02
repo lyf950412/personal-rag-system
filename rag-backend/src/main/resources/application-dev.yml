@@ -44,6 +44,15 @@ spring:
       dimensions: ${EMBEDDING_DIMENSIONS:1536}
       encoding-format: float
       text-instruction: 为这个文本生成向量表示
+    dashscope:
+      api-key: ${OPENAI_API_KEY:your-dashscope-api-key}
+      base-url: ${OPENAI_BASE_URL:your-dashscope-api-key}
+      chat:
+        model: ${AI_MODEL:MiniMax-M2.7}
+        max-tokens: 2000
+      embedding:
+        model: ${EMBEDDING_MODEL:text-embedding-v4}
+        dimensions: ${EMBEDDING_DIMENSIONS:1024}
 # 日志
 logging:
   level:
