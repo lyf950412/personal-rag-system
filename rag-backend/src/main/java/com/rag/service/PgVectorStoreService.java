@@ -2,10 +2,14 @@ package com.rag.service;
 
 import com.rag.entity.VectorStore;
 import com.rag.repository.VectorStoreRepository;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.rag.util.JsonUtil;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.ai.document.Document;
 import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -14,7 +18,10 @@ import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 public class PgVectorStoreService {
@@ -29,6 +36,8 @@ public class PgVectorStoreService {
 
     @PersistenceContext
     private EntityManager entityManager;
+
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Value("${ai.rag.retrieval.top-k:5}")
     private int topK;
@@ -73,27 +82,85 @@ public class PgVectorStoreService {
     }
 
     @Transactional
-    public void addDocument(String documentId, List<String> contentChunks, String metadata) {
+    public void addDocument(String documentId, List<Document> contentChunks) {
         log.info("添加文档到PostgreSQL向量库 - documentId: {}, chunks: {}", documentId, contentChunks.size());
 
         try {
-            for (String contentChunk : contentChunks) {
-                float[] embedding = generateEmbedding(contentChunk);
-                String embeddingStr = arrayToString(embedding);
+            int batchSize = 50;
+            List<VectorStore> batchToSave = new ArrayList<>();
 
-                VectorStore vectorStore = new VectorStore();
-                vectorStore.setDocumentId(documentId);
-                vectorStore.setContent(contentChunk);
-                vectorStore.setMetadata(metadata != null ? metadata : "");
-                vectorStore.setEmbedding(embeddingStr);
+            for (int i = 0; i < contentChunks.size(); i += batchSize) {
+                int end = Math.min(i + batchSize, contentChunks.size());
+                List<Document> chunkBatch = contentChunks.subList(i, end);
 
-                vectorStoreRepository.save(vectorStore);
+                List<String> texts = chunkBatch.stream().map(Document::getText).collect(Collectors.toList());
+                List<float[]> embeddings = generateEmbeddings(texts);
+
+                for (int j = 0; j < chunkBatch.size(); j++) {
+                    Document doc = chunkBatch.get(j);
+                    VectorStore vectorStore = new VectorStore();
+                    vectorStore.setDocumentId(documentId);
+                    vectorStore.setContent(doc.getText());
+                    vectorStore.setMetadata(JsonUtil.toJson(doc.getMetadata()));
+                    vectorStore.setEmbedding(arrayToString(embeddings.get(j)));
+                    batchToSave.add(vectorStore);
+                }
+
+                vectorStoreRepository.saveAll(batchToSave);
+                entityManager.flush();
+                entityManager.clear();
+                batchToSave.clear();
+                log.debug("已批量保存 {} 个向量", end);
             }
 
-            log.info("文档添加成功 - documentId: {}", documentId);
+            log.info("文档添加成功 - documentId: {}, total chunks: {}", documentId, contentChunks.size());
         } catch (Exception e) {
             log.error("添加文档到PostgreSQL失败", e);
             throw new RuntimeException("添加文档到PostgreSQL失败", e);
+        }
+    }
+
+    @Transactional
+    public void addDocuments(List<DocumentBatch> batch) {
+        log.info("批量添加文档到PostgreSQL向量库 - 批次大小: {}", batch.size());
+
+        try {
+            int totalChunks = 0;
+            int batchSize = 50;
+            List<VectorStore> batchToSave = new ArrayList<>();
+
+            for (DocumentBatch doc : batch) {
+                for (String contentChunk : doc.contentChunks()) {
+                    float[] embedding = generateEmbedding(contentChunk);
+                    String embeddingStr = arrayToString(embedding);
+
+                    VectorStore vectorStore = new VectorStore();
+                    vectorStore.setDocumentId(doc.documentId());
+                    vectorStore.setContent(contentChunk);
+                    vectorStore.setMetadata(doc.metadata() != null ? doc.metadata() : "");
+                    vectorStore.setEmbedding(embeddingStr);
+
+                    batchToSave.add(vectorStore);
+                    totalChunks++;
+
+                    if (batchToSave.size() >= batchSize) {
+                        vectorStoreRepository.saveAll(batchToSave);
+                        entityManager.flush();
+                        entityManager.clear();
+                        batchToSave.clear();
+                        log.debug("已批量保存 {} 个向量", totalChunks);
+                    }
+                }
+            }
+
+            if (!batchToSave.isEmpty()) {
+                vectorStoreRepository.saveAll(batchToSave);
+            }
+
+            log.info("批量文档添加成功 - 总chunks: {}", totalChunks);
+        } catch (Exception e) {
+            log.error("批量添加文档到PostgreSQL失败", e);
+            throw new RuntimeException("批量添加文档到PostgreSQL失败", e);
         }
     }
 
@@ -154,6 +221,17 @@ public class PgVectorStoreService {
         }
     }
 
+    private List<float[]> generateEmbeddings(List<String> texts) {
+        try {
+            return texts.stream()
+                    .map(this::generateEmbedding)
+                    .collect(Collectors.toList());
+        } catch (Exception e) {
+            log.error("批量生成embedding失败", e);
+            throw new RuntimeException("批量生成embedding失败: " + e.getMessage(), e);
+        }
+    }
+
     private String arrayToString(float[] array) {
         StringBuilder sb = new StringBuilder("[");
         for (int i = 0; i < array.length; i++) {
@@ -166,6 +244,7 @@ public class PgVectorStoreService {
         return sb.toString();
     }
 
+
     public int getTopK() {
         return topK;
     }
@@ -173,4 +252,6 @@ public class PgVectorStoreService {
     public double getSimilarityThreshold() {
         return similarityThreshold;
     }
+
+    public record DocumentBatch(String documentId, List<String> contentChunks, String metadata) {}
 }

@@ -3,6 +3,7 @@ package com.rag.service;
 import com.rag.dto.ChatMessageDTO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.ai.document.Document;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
@@ -150,11 +151,11 @@ public class RAGService {
         return response;
     }
 
-    public void addToKnowledgeBase(Long knowledgeBaseId, String documentId, List<String> contentChunks) {
-        log.info("Adding content to knowledge base - KB: {}, doc: {}, length: {}",
+    public void addToKnowledgeBase(Long knowledgeBaseId, String documentId, List<Document> contentChunks) {
+        log.info("Adding content to knowledge base - KB: {}, doc: {}, chunks: {}",
                 knowledgeBaseId, documentId, contentChunks.size());
 
-        vectorStoreService.addDocument(documentId, contentChunks, "knowledgeBaseId:" + knowledgeBaseId);
+        vectorStoreService.addDocument(documentId, contentChunks);
     }
 
     public void removeFromKnowledgeBase(String documentId) {

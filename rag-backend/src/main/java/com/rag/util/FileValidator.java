@@ -17,7 +17,7 @@ public class FileValidator {
         "MP4", "AVI", "MOV"
     );
     
-    private static final Pattern SAFE_FILENAME_PATTERN = Pattern.compile("^[\\p{L}\\p{N}._-]+$");
+    private static final Pattern SAFE_FILENAME_PATTERN = Pattern.compile("^[^\\x00-\\x1f/\\\\:*?\"<>|]+$");
     private static final long MAX_FILE_SIZE = 500 * 1024 * 1024L;
     
     public static void validateFile(MultipartFile file) {
@@ -27,6 +27,10 @@ public class FileValidator {
         validateFileName(file.getOriginalFilename());
         validateFileSize(file);
         validateFileExtension(file);
+    }
+    
+    public static void validateFilename(String filename) {
+        validateFileName(filename);
     }
     
     private static void validateFileName(String filename) {

@@ -1,15 +1,19 @@
 package com.rag.controller;
 
+import com.rag.config.TosConfig;
 import com.rag.dto.ApiResponse;
+import com.rag.dto.ConfirmUploadRequest;
 import com.rag.dto.DocumentDTO;
+import com.rag.dto.StsCredentialRequest;
 import com.rag.service.DocumentService;
+import com.rag.service.storage.StsCredential;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
-import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/documents")
@@ -17,15 +21,11 @@ import java.util.List;
 public class DocumentController {
     
     private final DocumentService documentService;
+    private final TosConfig tosConfig;
     
-    public DocumentController(DocumentService documentService) {
+    public DocumentController(DocumentService documentService, TosConfig tosConfig) {
         this.documentService = documentService;
-    }
-    
-    @GetMapping
-    @Operation(summary = "获取所有文档", description = "获取系统中所有上传的文档列表")
-    public ApiResponse<List<DocumentDTO>> getAllDocuments() {
-        return ApiResponse.success(documentService.getAllDocuments());
+        this.tosConfig = tosConfig;
     }
     
     @GetMapping("/recent")
@@ -36,13 +36,6 @@ public class DocumentController {
         return ApiResponse.success(documentService.getRecentDocuments(limit));
     }
     
-    @GetMapping("/{id}")
-    @Operation(summary = "获取文档详情", description = "根据文档ID获取文档详细信息")
-    @Parameter(name = "id", description = "文档ID", required = true)
-    public ApiResponse<DocumentDTO> getDocumentById(@PathVariable Long id) {
-        return ApiResponse.success(documentService.getDocumentById(id));
-    }
-    
     @GetMapping("/knowledge-base/{kbId}")
     @Operation(summary = "按知识库获取文档", description = "获取指定知识库中的所有文档")
     @Parameter(name = "kbId", description = "知识库ID", required = true)
@@ -50,14 +43,26 @@ public class DocumentController {
         return ApiResponse.success(documentService.getDocumentsByKnowledgeBase(kbId));
     }
     
-    @PostMapping("/upload")
-    @Operation(summary = "上传文档", description = "上传文档到指定知识库，支持PDF、Word、TXT等格式")
-    @Parameter(name = "file", description = "要上传的文件", required = true)
-    @Parameter(name = "knowledgeBaseId", description = "目标知识库ID", required = true)
-    public ApiResponse<DocumentDTO> uploadDocument(
-            @RequestParam("file") MultipartFile file,
-            @RequestParam("knowledgeBaseId") Long knowledgeBaseId) throws IOException {
-        return ApiResponse.success("文件上传成功", documentService.uploadDocument(file, knowledgeBaseId));
+    @PostMapping("/sts-credential")
+    @Operation(summary = "获取STS临时凭证", description = "获取用于前端直传对象存储的临时凭证")
+    public ApiResponse<Map<String, Object>> getStsCredential(@Valid @RequestBody StsCredentialRequest request) {
+        StsCredential credential = documentService.getStsCredential(request);
+        String objectKey = tosConfig.generateObjectKey(request.getFileName(), request.getFilePath());
+        return ApiResponse.success("获取STS凭证成功", Map.of(
+                "accessKeyId", credential.getAccessKeyId(),
+                "secretAccessKey", credential.getSecretAccessKey(),
+                "sessionToken", credential.getSessionToken(),
+                "expiration", credential.getExpiration(),
+                "bucketName", credential.getBucketName(),
+                "objectKey", objectKey
+        ));
+    }
+    
+    @PostMapping("/confirm-upload")
+    @Operation(summary = "确认上传完成", description = "客户端使用STS凭证上传完成后调用此接口确认")
+    public ApiResponse<DocumentDTO> confirmUpload(@Valid @RequestBody ConfirmUploadRequest request) {
+        return ApiResponse.success("文件上传确认成功", 
+                documentService.confirmUpload(request));
     }
     
     @DeleteMapping("/{id}")

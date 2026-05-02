@@ -56,6 +56,19 @@ public class DocumentReaderService {
                 .collect(Collectors.toList());
     }
 
+    public List<Document> parseAndSplitDocumentWithMetadata(File file) throws IOException {
+        log.info("开始解析文档并保留metadata(File): {}, 大小: {} bytes", file.getName(), file.length());
+
+        Resource resource = new FileSystemResource(file);
+        List<Document> documents = parseWithTika(resource);
+        List<Document> splitDocuments = tokenTextSplitter.apply(documents);
+        
+        log.info("文档解析完成(File): 原始块数={}, 分词后块数={}", 
+                documents.size(), splitDocuments.size());
+
+        return splitDocuments;
+    }
+
     public List<Document> parseWithTika(Resource resource) {
         try {
             TikaDocumentReader reader = new TikaDocumentReader(resource);

@@ -23,11 +23,18 @@
 - 异步文档处理
 - 上传进度追踪
 
+✅ **对象存储集成**
+- 火山引擎 TOS 对象存储
+- 前端直传对象存储（STS临时凭证）
+- 后端自动解析文件并向量化
+- 私有桶预签名URL支持
+
 ✅ **智能问答**
 - 基于RAG技术的智能问答
 - 支持选择特定知识库
 - 答案来源追溯
 - 对话历史管理
+- 流式输出（SSE）
 - 复制、评价、重新生成功能
 
 ✅ **向量化存储**
@@ -83,16 +90,20 @@ rag/
 │   │   │   └── DashboardController.java
 │   │   ├── service/               # 业务逻辑层
 │   │   │   ├── AuthService.java
-│   │   │   ├── ChatService.java
+│   │   │   ├── PersistentChatService.java
 │   │   │   ├── DocumentService.java
-│   │   │   ├── DocumentReaderService.java
-│   │   │   ├── PgVectorStoreService.java
+│   │   │   ├── TikaFileParserService.java
 │   │   │   ├── RAGService.java
-│   │   │   └── TikaFileParserService.java
+│   │   │   └── storage/           # 对象存储服务
+│   │   │       ├── ObjectStorageService.java
+│   │   │       └── VolcengineTosStorageService.java
 │   │   ├── entity/                # 数据实体
 │   │   ├── repository/            # 数据访问层
 │   │   ├── dto/                   # 数据传输对象
+│   │   │   ├── StsCredentialRequest.java
+│   │   │   └── ConfirmUploadRequest.java
 │   │   ├── config/                # 配置类
+│   │   │   └── TosConfig.java     # TOS对象存储配置
 │   │   ├── security/              # 安全相关
 │   │   └── constant/              # 常量定义
 │   └── pom.xml
@@ -204,7 +215,27 @@ spring:
 jwt:
   secret: your-jwt-secret-key
   expiration: 86400000
+
+# 火山引擎TOS对象存储配置
+tos:
+  endpoint: tos-cn-beijing.volces.com
+  access-key: your-tos-access-key
+  secret-key: your-tos-secret-key
+  bucket-name: your-bucket-name
+  region: cn-beijing
+  # STS临时凭证配置
+  sts:
+    role-arn: trn:iam::your-account-id:role/tos_role
+    duration-seconds: 3600
 ```
+
+### 对象存储上传流程
+
+1. 前端请求后端获取 STS 临时凭证（包含文件信息）
+2. 后端生成 objectKey 并返回 STS 临时凭证
+3. 前端使用 STS 凭证直传文件到 TOS 对象存储
+4. 上传成功后前端调用 confirm-upload 接口
+5. 后端保存文档记录并异步解析、向量化存储
 
 ### 火山引擎配置
 
@@ -236,8 +267,10 @@ spring:
 - `DELETE /api/knowledge-bases/{id}` - 删除知识库
 
 ### 文档管理
-- `GET /api/documents` - 获取所有文档
-- `POST /api/documents/upload` - 上传文档
+- `GET /api/documents/recent` - 获取最近文档
+- `GET /api/documents/knowledge-base/{kbId}` - 按知识库获取文档
+- `POST /api/documents/sts-credential` - 获取STS临时凭证
+- `POST /api/documents/confirm-upload` - 确认上传完成
 - `DELETE /api/documents/{id}` - 删除文档
 
 ### 智能问答
@@ -301,19 +334,25 @@ CREATE INDEX ON vector_record USING ivfflat (embedding vector_cosine_ops);
 ## 文档处理流程
 
 ```
-1. 用户上传文档
+1. 前端选择文件
    ↓
-2. DocumentService保存文件
+2. 前端请求后端获取 STS 临时凭证（携带文件信息）
    ↓
-3. TikaFileParserService异步处理
+3. 后端生成 objectKey 并返回 STS 凭证
    ↓
-4. DocumentReaderService解析文档
+4. 前端使用 STS 凭证直传文件到 TOS 对象存储
    ↓
-5. TokenTextSplitter分块处理
+5. 上传成功后前端调用 confirm-upload 接口
    ↓
-6. PgVectorStoreService向量化存储
+6. 后端保存文档记录
    ↓
-7. 更新文档状态
+7. TikaFileParserService异步解析文档
+   ↓
+8. DocumentReaderService分块处理
+   ↓
+9. RAGService向量化存储到 pgvector
+   ↓
+10. 更新文档状态为已完成
 ```
 
 ## 开发指南

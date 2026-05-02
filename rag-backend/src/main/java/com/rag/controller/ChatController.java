@@ -2,8 +2,6 @@ package com.rag.controller;
 
 import com.rag.dto.ApiResponse;
 import com.rag.dto.ChatMessageDTO;
-import com.rag.entity.User;
-import com.rag.repository.UserRepository;
 import com.rag.service.PersistentChatService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -11,14 +9,11 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import jakarta.validation.Valid;
 import java.util.List;
-import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/chat")
@@ -27,11 +22,9 @@ public class ChatController {
 
     private static final Logger log = LoggerFactory.getLogger(ChatController.class);
     private final PersistentChatService chatService;
-    private final UserRepository userRepository;
 
-    public ChatController(PersistentChatService chatService, UserRepository userRepository) {
+    public ChatController(PersistentChatService chatService) {
         this.chatService = chatService;
-        this.userRepository = userRepository;
     }
 
     @GetMapping("/history/{sessionId}")
@@ -46,16 +39,15 @@ public class ChatController {
     @PostMapping
     @Operation(summary = "发送消息", description = "向AI助手发送消息并获取回答")
     public ApiResponse<ChatMessageDTO> chat(@Valid @RequestBody ChatRequest request) {
-        String sessionId = request.getSessionId();
-        if (sessionId == null || sessionId.isEmpty()) {
-            sessionId = UUID.randomUUID().toString();
-        }
-        
-        Long userId = getCurrentUserId();
+        Long userId = chatService.getCurrentUserId();
         log.info("Processing chat request - sessionId: {}, question length: {}, userId: {}", 
-                sessionId, request.getQuestion().length(), userId);
+                request.getSessionId(), request.getQuestion().length(), userId);
         
-        ChatMessageDTO response = chatService.chat(sessionId, request.getQuestion(), request.getKnowledgeBaseId(), userId);
+        ChatMessageDTO response = chatService.chat(
+                request.getSessionId(), 
+                request.getQuestion(), 
+                request.getKnowledgeBaseId(), 
+                userId);
         return ApiResponse.success(response);
     }
 
@@ -66,84 +58,8 @@ public class ChatController {
             @RequestParam String question,
             @RequestParam(required = false) Long knowledgeBaseId) {
         
-        final String finalSessionId;
-        if (sessionId == null || sessionId.isEmpty()) {
-            finalSessionId = UUID.randomUUID().toString();
-        } else {
-            finalSessionId = sessionId;
-        }
-        
-        log.info("Processing stream chat request - sessionId: {}, question length: {}", 
-                finalSessionId, question.length());
-        
-        SseEmitter emitter = new SseEmitter(0L);
-        
-        final Long userId = getCurrentUserId();
-        
-        try {
-            chatService.chatStream(
-                finalSessionId, 
-                question, 
-                knowledgeBaseId, 
-                userId,
-                content -> {
-                    try {
-                        if (content != null && !content.isEmpty()) {
-                            emitter.send(SseEmitter.event()
-                                .name("message")
-                                .data(content, MediaType.TEXT_PLAIN));
-                        }
-                    } catch (Exception e) {
-                        log.error("Error sending SSE content", e);
-                    }
-                },
-                error -> {
-                    log.error("Stream error", error);
-                    try {
-                        emitter.send(SseEmitter.event()
-                            .name("error")
-                            .data("Error: " + error.getMessage()));
-                    } catch (Exception e) {
-                        log.error("Error sending error event", e);
-                    }
-                    emitter.completeWithError(error);
-                },
-                () -> {
-                    log.info("Stream completed successfully - sessionId: {}", finalSessionId);
-                    try {
-                        emitter.send(SseEmitter.event()
-                            .name("message")
-                            .data("[DONE]"));
-                        emitter.complete();
-                    } catch (Exception e) {
-                        log.error("Error completing emitter", e);
-                        try {
-                            emitter.complete();
-                        } catch (Exception ex) {
-                            log.error("Error completing emitter (retry)", ex);
-                        }
-                    }
-                    log.info("Emitter completed and connection closed - sessionId: {}", finalSessionId);
-                }
-            );
-        } catch (Exception e) {
-            log.error("Error in stream chat processing", e);
-            try {
-                emitter.send(SseEmitter.event()
-                    .name("error")
-                    .data("处理失败：" + e.getMessage()));
-                emitter.completeWithError(e);
-            } catch (Exception ex) {
-                log.error("Error sending error event", ex);
-                emitter.completeWithError(e);
-            }
-        }
-        
-        emitter.onCompletion(() -> log.info("SSE completed - sessionId: {}", finalSessionId));
-        emitter.onTimeout(() -> log.warn("SSE timeout - sessionId: {}", finalSessionId));
-        emitter.onError(e -> log.error("SSE error - sessionId: {}", finalSessionId, e));
-        
-        return emitter;
+        Long userId = chatService.getCurrentUserId();
+        return chatService.chatStream(sessionId, question, knowledgeBaseId, userId);
     }
 
     @DeleteMapping("/session/{sessionId}")
@@ -162,18 +78,6 @@ public class ChatController {
                 "activeSessions", chatService.getActiveSessionCount(),
                 "sessionTimeout", chatService.getSessionTimeoutSeconds()
         ));
-    }
-
-    private Long getCurrentUserId() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication != null && authentication.isAuthenticated() && !"anonymousUser".equals(authentication.getPrincipal())) {
-            String username = authentication.getName();
-            User user = userRepository.findByUsername(username).orElse(null);
-            if (user != null) {
-                return user.getId();
-            }
-        }
-        return 1L;
     }
 
     public static class ChatRequest {

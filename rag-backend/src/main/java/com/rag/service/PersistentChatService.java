@@ -6,16 +6,23 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rag.dto.ChatMessageDTO;
 import com.rag.entity.ChatMessage;
 import com.rag.entity.ChatSession;
+import com.rag.entity.User;
 import com.rag.repository.ChatMessageRepository;
 import com.rag.repository.ChatSessionRepository;
+import com.rag.repository.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.MediaType;
 import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import reactor.core.publisher.Flux;
 
+import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -30,6 +37,7 @@ public class PersistentChatService {
     private final ChatMessageRepository messageRepository;
     private final RAGService ragService;
     private final ObjectMapper objectMapper;
+    private final UserRepository userRepository;
 
     @Value("${ai.chat.max-history-size:100}")
     private int maxHistorySize;
@@ -40,11 +48,13 @@ public class PersistentChatService {
     public PersistentChatService(ChatSessionRepository sessionRepository,
                                  ChatMessageRepository messageRepository,
                                  RAGService ragService,
-                                 ObjectMapper objectMapper) {
+                                 ObjectMapper objectMapper,
+                                 UserRepository userRepository) {
         this.sessionRepository = sessionRepository;
         this.messageRepository = messageRepository;
         this.ragService = ragService;
         this.objectMapper = objectMapper;
+        this.userRepository = userRepository;
     }
 
     @Transactional(readOnly = true)
@@ -65,11 +75,13 @@ public class PersistentChatService {
 
     @Transactional
     public ChatMessageDTO chat(String sessionId, String question, Long knowledgeBaseId, Long userId) {
+        String finalSessionId = sessionId != null && !sessionId.isEmpty() ? sessionId : java.util.UUID.randomUUID().toString();
+        
         log.info("Processing chat request - session: {}, question: {}, KB: {}, user: {}", 
-                sessionId, question, knowledgeBaseId, userId);
+                finalSessionId, question, knowledgeBaseId, userId);
 
-        ChatSession session = sessionRepository.findBySessionId(sessionId)
-                .orElseGet(() -> createSession(sessionId, userId, knowledgeBaseId));
+        ChatSession session = sessionRepository.findBySessionId(finalSessionId)
+                .orElseGet(() -> createSession(finalSessionId, userId, knowledgeBaseId));
 
         ChatMessage userMessage = createAndSaveMessage(session, "user", question);
 
@@ -110,18 +122,18 @@ public class PersistentChatService {
         }
     }
 
-    @Transactional
-    public void chatStream(String sessionId, String question, Long knowledgeBaseId, Long userId, 
-                          java.util.function.Consumer<String> onContent, 
-                          java.util.function.Consumer<Throwable> onError,
-                          java.lang.Runnable onComplete) {
-        log.info("Processing chat stream request - session: {}, question: {}, KB: {}, user: {}", 
-                sessionId, question, knowledgeBaseId, userId);
+    public SseEmitter chatStream(String sessionId, String question, Long knowledgeBaseId, Long userId) {
+        SseEmitter emitter = new SseEmitter(0L);
+        
+        final String finalSessionId = sessionId != null && !sessionId.isEmpty() ? sessionId : java.util.UUID.randomUUID().toString();
+        
+        log.info("Processing stream chat request - sessionId: {}, question length: {}, userId: {}", 
+                finalSessionId, question.length(), userId);
+        
+        ChatSession session = sessionRepository.findBySessionId(finalSessionId)
+                .orElseGet(() -> createSession(finalSessionId, userId, knowledgeBaseId));
 
-        ChatSession session = sessionRepository.findBySessionId(sessionId)
-                .orElseGet(() -> createSession(sessionId, userId, knowledgeBaseId));
-
-        ChatMessage userMessage = createAndSaveMessage(session, "user", question);
+        createAndSaveMessage(session, "user", question);
 
         Flux<String> stream = ragService.answerStream(question, knowledgeBaseId);
         
@@ -130,18 +142,50 @@ public class PersistentChatService {
         stream.subscribe(
             content -> {
                 fullResponse.append(content);
-                onContent.accept(content);
+                try {
+                    emitter.send(SseEmitter.event()
+                        .name("message")
+                        .data(content, MediaType.TEXT_PLAIN));
+                } catch (IOException e) {
+                    log.error("Error sending SSE content", e);
+                }
             },
             error -> {
-                log.error("Stream error in session {}", sessionId, error);
-                onError.accept(error);
+                log.error("Stream error in session {}", finalSessionId, error);
+                try {
+                    emitter.send(SseEmitter.event()
+                        .name("error")
+                        .data("Error: " + error.getMessage()));
+                } catch (IOException e) {
+                    log.error("Error sending error event", e);
+                }
+                emitter.completeWithError(error);
             },
             () -> {
-                log.info("Stream completed for session {}, response length: {}", sessionId, fullResponse.length());
+                log.info("Stream completed for session {}, response length: {}", finalSessionId, fullResponse.length());
                 createAndSaveMessage(session, "assistant", fullResponse.toString());
-                onComplete.run();
+                try {
+                    emitter.send(SseEmitter.event()
+                        .name("message")
+                        .data("[DONE]"));
+                    emitter.complete();
+                } catch (IOException e) {
+                    log.error("Error completing emitter", e);
+                    try {
+                        emitter.complete();
+                    } catch (IOException ex) {
+                        log.error("Error completing emitter (retry)", ex);
+                    }
+                }
+                log.info("Emitter completed and connection closed - sessionId: {}", finalSessionId);
             }
         );
+        
+        emitter.onCompletion(() -> log.info("SSE completed - sessionId: {}", finalSessionId));
+        emitter.onTimeout(() -> log.warn("SSE timeout - sessionId: {}", finalSessionId));
+        emitter.onError(e -> log.error("SSE error - sessionId: {}", finalSessionId, e));
+        
+        return emitter;
     }
 
     @Transactional
@@ -180,6 +224,18 @@ public class PersistentChatService {
 
     public long getSessionTimeoutSeconds() {
         return sessionTimeoutSeconds;
+    }
+
+    public Long getCurrentUserId() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null && authentication.isAuthenticated() && !"anonymousUser".equals(authentication.getPrincipal())) {
+            String username = authentication.getName();
+            User user = userRepository.findByUsername(username).orElse(null);
+            if (user != null) {
+                return user.getId();
+            }
+        }
+        return 1L;
     }
 
     private ChatSession createSession(String sessionId, Long userId, Long knowledgeBaseId) {

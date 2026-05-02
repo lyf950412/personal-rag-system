@@ -14,7 +14,8 @@ import {
   ReloadOutlined,
 } from '@ant-design/icons'
 import { useLocation } from 'react-router-dom'
-import { documentApi, knowledgeBaseApi } from '../services'
+import { documentApi, knowledgeBaseApi, tosConfig } from '../services'
+import { TosClient } from '@volcengine/tos-sdk'
 import styles from './FileUpload.module.css'
 
 const { Dragger } = Upload
@@ -33,6 +34,7 @@ function FileUpload() {
   const [recentDocuments, setRecentDocuments] = useState([])
   const [loading, setLoading] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [uploadingFiles] = useState(new Set())
   const location = useLocation()
 
   useEffect(() => {
@@ -67,6 +69,64 @@ function FileUpload() {
     }
   }
 
+  const getFileExtension = (filename) => {
+    const ext = filename.split('.').pop()?.toUpperCase() || ''
+    return ext
+  }
+
+  const uploadToTosWithSts = async (file) => {
+    const stsResponse = await documentApi.getStsCredential(file.name, 'documents', null, file.size)
+    const stsData = stsResponse.data || stsResponse
+    
+    console.log('=== STS Credential 调试 ===')
+    console.log('STS 响应:', JSON.stringify(stsData, null, 2))
+    
+    const client = new TosClient({
+      region: tosConfig.region,
+      endpoint: tosConfig.endpoint,
+      accessKeyId: stsData.accessKeyId,
+      accessKeySecret: stsData.secretAccessKey,
+      stsToken: stsData.sessionToken,
+    })
+    
+    const result = await client.putObject({
+      bucket: stsData.bucketName,
+      key: stsData.objectKey,
+      body: file,
+    })
+    
+    console.log('上传成功:', result)
+    return { result, objectKey: stsData.objectKey }
+  }
+
+  const handleStsUpload = async (file) => {
+    if (uploadingFiles.has(file.name)) {
+      throw new Error('文件正在上传中')
+    }
+    uploadingFiles.add(file.name)
+    
+    try {
+      const { result, objectKey } = await uploadToTosWithSts(file)
+      
+      const fileExtension = getFileExtension(file.name)
+      
+      await documentApi.confirmUpload({
+        objectKey,
+        originalFilename: file.name,
+        fileExtension,
+        knowledgeBaseId: parseInt(selectedKB),
+        fileSize: file.size
+      })
+      
+      return true
+    } catch (error) {
+      console.error('上传失败:', error)
+      throw error
+    } finally {
+      uploadingFiles.delete(file.name)
+    }
+  }
+
   const uploadProps = {
     name: 'file',
     multiple: true,
@@ -79,23 +139,19 @@ function FileUpload() {
       return true
     },
     customRequest: async (options) => {
-      const { file, onSuccess, onError, onProgress } = options
+      const { file, onSuccess, onError } = options
       
       setUploading(true)
       
       try {
-        const formData = new FormData()
-        formData.append('file', file)
-        formData.append('knowledgeBaseId', selectedKB)
-        
-        await documentApi.upload(file, selectedKB)
+        await handleStsUpload(file)
         
         message.success(`${file.name} 上传成功`)
         onSuccess && onSuccess()
         fetchRecentDocuments()
       } catch (error) {
         console.error('上传失败:', error)
-        message.error(`${file.name} 上传失败`)
+        message.error(`${file.name} 上传失败: ${error.message}`)
         onError && onError(error)
       } finally {
         setUploading(false)

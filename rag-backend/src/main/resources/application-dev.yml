@@ -94,3 +94,13 @@ ai:
   rag:
     retrieval:
       top-k: 5
+
+# 对象存储配置（火山引擎 TOS）
+storage:
+  tos:
+    endpoint: ${TOS_ENDPOINT:tos-cn-beijing.volces.com}
+    region: ${TOS_REGION:cn-beijing}
+    access-key: ${TOS_ACCESS_KEY}
+    secret-key: ${TOS_SECRET_KEY}
+    bucket-name: ${TOS_BUCKET_NAME}
+    role-arn: ${TOS_ROLE_ARN}

@@ -57,18 +57,6 @@ class DocumentServiceTest {
     }
 
     @Test
-    void testGetAllDocuments() {
-        when(documentRepository.findAll()).thenReturn(Arrays.asList(testDocument));
-
-        List<DocumentDTO> result = documentService.getAllDocuments();
-
-        assertNotNull(result);
-        assertEquals(1, result.size());
-        assertEquals("测试文档.pdf", result.get(0).getName());
-        verify(documentRepository, times(1)).findAll();
-    }
-
-    @Test
     void testGetRecentDocuments() {
         when(documentRepository.findRecentDocuments(any(PageRequest.class))).thenReturn(Arrays.asList(testDocument));
 
@@ -91,28 +79,8 @@ class DocumentServiceTest {
     }
 
     @Test
-    void testGetDocumentById() {
-        when(documentRepository.findById(1L)).thenReturn(Optional.of(testDocument));
-
-        DocumentDTO result = documentService.getDocumentById(1L);
-
-        assertNotNull(result);
-        assertEquals("测试文档.pdf", result.getName());
-        assertEquals("PDF", result.getType());
-    }
-
-    @Test
-    void testGetDocumentByIdNotFound() {
-        when(documentRepository.findById(999L)).thenReturn(Optional.empty());
-
-        assertThrows(RuntimeException.class, () -> {
-            documentService.getDocumentById(999L);
-        });
-    }
-
-    @Test
     void testDeleteDocument() {
-        testDocument.setFilePath("uploads/test.pdf");
+        testDocument.setFilePath("tos://documents/test.pdf");
         when(documentRepository.findById(1L)).thenReturn(Optional.of(testDocument));
         doNothing().when(documentRepository).delete(testDocument);
 

@@ -13,34 +13,21 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.web.client.RestTemplate;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
-@Component
 public class VolcengineEmbeddingModel implements EmbeddingModel {
 
     private static final Logger log = LoggerFactory.getLogger(VolcengineEmbeddingModel.class);
 
     private final RestTemplate restTemplate;
-    
-    @Value("${spring.ai.openai.api-key:}")
-    private String apiKey;
-    
-    @Value("${spring.ai.openai.base-url:https://ark.cn-beijing.volces.com/api/v3}")
-    private String baseUrl;
-    
-    @Value("${spring.ai.openai.embedding.model:doubao-embedding-vision-250615}")
-    private String modelName;
-    
-    @Value("${spring.ai.openai.embedding.dimensions:1024}")
-    private Integer dimensions;
+    private final VolcengineEmbeddingOptions options;
 
-    public VolcengineEmbeddingModel() {
+    public VolcengineEmbeddingModel(VolcengineEmbeddingOptions options) {
         this.restTemplate = new RestTemplate();
+        this.options = options;
     }
 
     @Override
@@ -67,26 +54,26 @@ public class VolcengineEmbeddingModel implements EmbeddingModel {
     }
 
     private float[] embedText(String text) {
-        String url = baseUrl + "/embeddings/multimodal";
+        String url = options.getBaseUrl() + "/embeddings/multimodal";
         
         VolcengineEmbeddingRequest.InputItem inputItem = new VolcengineEmbeddingRequest.InputItem();
         inputItem.setType("text");
         inputItem.setText(text);
         
         VolcengineEmbeddingRequest embeddingRequest = new VolcengineEmbeddingRequest();
-        embeddingRequest.setModel(modelName);
+        embeddingRequest.setModel(options.getModel());
         embeddingRequest.setInput(List.of(inputItem));
-        embeddingRequest.setEncodingFormat("float");
-        embeddingRequest.setDimensions(dimensions);
+        embeddingRequest.setEncodingFormat(options.getEncodingFormat());
+        embeddingRequest.setDimensions(options.getDimensions());
         
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.set("Authorization", "Bearer " + apiKey);
+        headers.set("Authorization", "Bearer " + options.getApiKey());
         
         HttpEntity<VolcengineEmbeddingRequest> entity = new HttpEntity<>(embeddingRequest, headers);
         
         log.debug("Calling Volcengine embedding API: {}", url);
-        log.debug("Request: model={}, dimensions={}", modelName, dimensions);
+        log.debug("Request: model={}, dimensions={}", options.getModel(), options.getDimensions());
         
         VolcengineEmbeddingResponse response = restTemplate.postForObject(url, entity, VolcengineEmbeddingResponse.class);
         
@@ -109,6 +96,6 @@ public class VolcengineEmbeddingModel implements EmbeddingModel {
 
     @Override
     public int dimensions() {
-        return dimensions;
+        return options.getDimensions();
     }
 }

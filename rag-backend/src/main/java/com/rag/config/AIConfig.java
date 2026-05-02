@@ -1,9 +1,9 @@
 package com.rag.config;
 
 import com.rag.ai.embedding.VolcengineEmbeddingModel;
+import com.rag.ai.embedding.VolcengineEmbeddingOptions;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor;
-import org.springframework.ai.document.MetadataMode;
 import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.ai.openai.api.OpenAiApi;
@@ -72,7 +72,14 @@ public class AIConfig {
     @Bean
     @Primary
     public VolcengineEmbeddingModel embeddingModel() {
-        return new VolcengineEmbeddingModel();
+        VolcengineEmbeddingOptions options = VolcengineEmbeddingOptions.builder()
+                .apiKey(apiKey)
+                .baseUrl(baseUrl)
+                .model(embeddingModel)
+                .dimensions(embeddingDimensions)
+                .encodingFormat("float")
+                .build();
+        return new VolcengineEmbeddingModel(options);
     }
 
     @Bean

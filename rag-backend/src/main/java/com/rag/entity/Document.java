@@ -28,9 +28,6 @@ public class Document {
     @Column(length = 1000)
     private String filePath;
 
-    @Column(columnDefinition = "TEXT")
-    private String content;
-
     @Column(length = 20)
     private String status = com.rag.constant.DocumentStatus.PENDING;
 
@@ -64,8 +61,6 @@ public class Document {
     public void setFileSize(String fileSize) { this.fileSize = fileSize; }
     public String getFilePath() { return filePath; }
     public void setFilePath(String filePath) { this.filePath = filePath; }
-    public String getContent() { return content; }
-    public void setContent(String content) { this.content = content; }
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
     public Integer getChunkCount() { return chunkCount; }

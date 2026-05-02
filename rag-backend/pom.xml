@@ -95,6 +95,17 @@
             <version>${spring-ai.version}</version>
         </dependency>
 
+        <!-- 火山引擎 TOS 对象存储 SDK -->
+        <dependency>
+            <groupId>com.volcengine</groupId>
+            <artifactId>ve-tos-java-sdk</artifactId>
+            <version>2.8.8</version>
+        </dependency>
+        <dependency>
+            <groupId>com.volcengine</groupId>
+            <artifactId>volc-sdk-java</artifactId>
+            <version>1.0.267</version>
+        </dependency>
 
         <!-- JWT -->
         <dependency>

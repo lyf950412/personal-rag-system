@@ -3,14 +3,16 @@ package com.rag.service;
 import com.rag.constant.DocumentStatus;
 import com.rag.entity.Document;
 import com.rag.repository.DocumentRepository;
+import com.rag.service.storage.ObjectStorageService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
+import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.List;
 
 @Service
@@ -22,42 +24,47 @@ public class TikaFileParserService {
     private final PgVectorStoreService vectorStoreService;
     private final RAGService ragService;
     private final DocumentReaderService documentReaderService;
+    private final ObjectStorageService objectStorageService;
 
     public TikaFileParserService(DocumentRepository documentRepository, 
                                   PgVectorStoreService vectorStoreService, 
                                   RAGService ragService,
-                                  DocumentReaderService documentReaderService) {
+                                  DocumentReaderService documentReaderService,
+                                  ObjectStorageService objectStorageService) {
         this.documentRepository = documentRepository;
         this.vectorStoreService = vectorStoreService;
         this.ragService = ragService;
         this.documentReaderService = documentReaderService;
+        this.objectStorageService = objectStorageService;
     }
 
     @Async("documentProcessorExecutor")
-    public void parseDocumentAsync(Long documentId, Path filePath, String fileExtension) {
+    public void parseDocumentAsync(Long documentId, String objectKey, String fileExtension) {
+        File tempFile = null;
         try {
-            log.info("Starting document parsing with DocumentReaderService: {}, type: {}", documentId, fileExtension);
+            log.info("Starting document parsing from object storage - documentId: {}, objectKey: {}, type: {}", documentId, objectKey, fileExtension);
             updateDocumentStatus(documentId, DocumentStatus.PROCESSING);
             
-            List<String> contentChunks = documentReaderService.parseAndSplitDocument(filePath.toFile());
-            log.info("文档分割完成 - documentId: {}, 块数: {}", documentId, contentChunks.size());
+            InputStream inputStream = objectStorageService.download(objectKey);
+            tempFile = File.createTempFile("rag-doc-", "." + fileExtension.toLowerCase());
+            Files.copy(inputStream, tempFile.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
             
-            String content = String.join("\n\n", contentChunks);
+            List<org.springframework.ai.document.Document> springAiDocuments = documentReaderService.parseAndSplitDocumentWithMetadata(tempFile);
+            log.info("文档分割完成 - documentId: {}, 块数: {}", documentId, springAiDocuments.size());
             
             Document doc = documentRepository.findById(documentId).orElse(null);
             if (doc != null) {
-                doc.setContent(content);
-                int chunkCount = contentChunks.size();
+                int chunkCount = springAiDocuments.size();
                 doc.setChunkCount(chunkCount);
                 doc.setVectorCount(chunkCount);
                 documentRepository.save(doc);
 
-                if (content != null && !content.isEmpty()) {
-                    log.info("开始向量化 - documentId: {}, 内容长度: {}", documentId, content.length());
+                if (!springAiDocuments.isEmpty()) {
+                    log.info("开始向量化 - documentId: {}, 块数: {}", documentId, springAiDocuments.size());
                     ragService.addToKnowledgeBase(
                             doc.getKnowledgeBase().getId(),
                             String.valueOf(documentId),
-                            contentChunks
+                            springAiDocuments
                     );
                     log.info("文档向量化成功 - documentId: {}", documentId);
                 } else {
@@ -66,17 +73,21 @@ public class TikaFileParserService {
             }
             
             updateDocumentStatus(documentId, DocumentStatus.COMPLETED);
-            log.info("Document parsing completed: {}, chunks: {}", documentId, contentChunks.size());
+            log.info("Document parsing completed: {}, chunks: {}", documentId, springAiDocuments.size());
             
         } catch (Exception e) {
             log.error("Document parsing failed: " + documentId, e);
             updateDocumentStatusWithError(documentId, e.getMessage());
+        } finally {
+            if (tempFile != null && tempFile.exists()) {
+                tempFile.delete();
+            }
         }
     }
 
-    public String detectContentType(Path filePath) {
+    public String detectContentType(String filename) {
         try {
-            String filename = filePath.getFileName().toString().toLowerCase();
+            filename = filename.toLowerCase();
             if (filename.endsWith(".pdf")) {
                 return "application/pdf";
             } else if (filename.endsWith(".doc") || filename.endsWith(".docx")) {
