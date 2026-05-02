@@ -1,16 +1,20 @@
 package com.rag.service;
 
+import com.rag.entity.VectorStore;
+import com.rag.repository.VectorStoreRepository;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
-import jakarta.transaction.Transactional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-import java.util.*;
+import java.util.List;
 
 @Service
 public class PgVectorStoreService {
@@ -19,6 +23,9 @@ public class PgVectorStoreService {
 
     @Autowired
     private EmbeddingModel embeddingModel;
+
+    @Autowired
+    private VectorStoreRepository vectorStoreRepository;
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -29,6 +36,7 @@ public class PgVectorStoreService {
     @Value("${ai.rag.retrieval.similarity-threshold:0.7}")
     private double similarityThreshold;
 
+    @EventListener(ApplicationReadyEvent.class)
     @Transactional
     public void initializeVectorTable() {
         try {
@@ -66,45 +74,33 @@ public class PgVectorStoreService {
 
     @Transactional
     public void addDocument(String documentId, List<String> contentChunks, String metadata) {
-        log.info("添加文档到PostgreSQL向量库 - documentId: {}, content length: {}", documentId, contentChunks.size());
+        log.info("添加文档到PostgreSQL向量库 - documentId: {}, chunks: {}", documentId, contentChunks.size());
 
         try {
-//            String cleanedContent = cleanAndValidateText(content);
-//            if (cleanedContent == null || cleanedContent.trim().isEmpty()) {
-//                log.warn("文档内容为空，跳过向量化 - documentId: {}", documentId);
-//                return;
-//            }
-
             for (String contentChunk : contentChunks) {
                 float[] embedding = generateEmbedding(contentChunk);
                 String embeddingStr = arrayToString(embedding);
 
-                String sql = """
-                INSERT INTO vector_store (document_id, content, metadata, embedding)
-                VALUES (:documentId, :content, :metadata, CAST(:embedding AS vector))
-            """;
-                entityManager.createNativeQuery(sql)
-                        .setParameter("documentId", documentId)
-                        .setParameter("content", contentChunk)
-                        .setParameter("metadata", metadata != null ? metadata : "")
-                        .setParameter("embedding", embeddingStr)
-                        .executeUpdate();
+                VectorStore vectorStore = new VectorStore();
+                vectorStore.setDocumentId(documentId);
+                vectorStore.setContent(contentChunk);
+                vectorStore.setMetadata(metadata != null ? metadata : "");
+                vectorStore.setEmbedding(embeddingStr);
 
-                log.info("文档添加成功 - documentId: {}", documentId);
+                vectorStoreRepository.save(vectorStore);
             }
 
+            log.info("文档添加成功 - documentId: {}", documentId);
         } catch (Exception e) {
             log.error("添加文档到PostgreSQL失败", e);
             throw new RuntimeException("添加文档到PostgreSQL失败", e);
         }
     }
 
-    @SuppressWarnings("unchecked")
     public List<String> search(String query) {
         return search(query, topK);
     }
 
-    @SuppressWarnings("unchecked")
     public List<String> search(String query, int topK) {
         log.info("PostgreSQL向量搜索 - query: {}, topK: {}", query, topK);
 
@@ -112,26 +108,10 @@ public class PgVectorStoreService {
             float[] queryEmbedding = generateEmbedding(query);
             String embeddingStr = arrayToString(queryEmbedding);
 
-            String sql = """
-                SELECT content FROM vector_store
-                ORDER BY embedding <=> CAST(:queryEmbedding AS vector)
-                LIMIT :topK
-            """;
+            List<String> results = vectorStoreRepository.searchBySimilarity(embeddingStr, topK);
 
-            List<Object> results = entityManager.createNativeQuery(sql)
-                    .setParameter("queryEmbedding", embeddingStr)
-                    .setParameter("topK", topK)
-                    .getResultList();
-
-            List<String> contents = new ArrayList<>();
-            for (Object result : results) {
-                if (result != null) {
-                    contents.add(result.toString());
-                }
-            }
-
-            log.info("搜索完成 - 结果数: {}", contents.size());
-            return contents;
+            log.info("搜索完成 - 结果数: {}", results.size());
+            return results;
         } catch (Exception e) {
             log.error("PostgreSQL向量搜索失败", e);
             throw new RuntimeException("PostgreSQL向量搜索失败", e);
@@ -143,12 +123,8 @@ public class PgVectorStoreService {
         log.info("从PostgreSQL删除文档 - documentId: {}", documentId);
 
         try {
-            String sql = "DELETE FROM vector_store WHERE document_id = :documentId";
-            int deleted = entityManager.createNativeQuery(sql)
-                    .setParameter("documentId", documentId)
-                    .executeUpdate();
-
-            log.info("文档删除成功 - documentId: {}, 删除行数: {}", documentId, deleted);
+            vectorStoreRepository.deleteByDocumentId(documentId);
+            log.info("文档删除成功 - documentId: {}", documentId);
         } catch (Exception e) {
             log.error("从PostgreSQL删除文档失败", e);
             throw new RuntimeException("从PostgreSQL删除文档失败", e);
@@ -160,7 +136,7 @@ public class PgVectorStoreService {
         log.info("清空PostgreSQL向量库");
 
         try {
-            entityManager.createNativeQuery("TRUNCATE TABLE vector_store").executeUpdate();
+            vectorStoreRepository.deleteAll();
             log.info("PostgreSQL向量库已清空");
         } catch (Exception e) {
             log.error("清空PostgreSQL向量库失败", e);
@@ -177,15 +153,6 @@ public class PgVectorStoreService {
             throw new RuntimeException("生成embedding失败: " + e.getMessage(), e);
         }
     }
-    private List<float[]> generateEmbeddingList(List<String> texts) {
-        try {
-            log.debug("生成embedding - 文本长度: {}", texts.size());
-            return embeddingModel.embed(texts);
-        } catch (Exception e) {
-            log.error("生成embedding失败 - 文本长度: {}, 错误: {}", texts.size(), e.getMessage());
-            throw new RuntimeException("生成embedding失败: " + e.getMessage(), e);
-        }
-    }
 
     private String arrayToString(float[] array) {
         StringBuilder sb = new StringBuilder("[");
@@ -197,27 +164,6 @@ public class PgVectorStoreService {
         }
         sb.append("]");
         return sb.toString();
-    }
-
-    private String cleanAndValidateText(String text) {
-        if (text == null) {
-            return null;
-        }
-        
-        String cleaned = text.trim();
-        
-        if (cleaned.isEmpty()) {
-            return null;
-        }
-        
-        cleaned = cleaned.replaceAll("\\s+", " ");
-        
-        if (cleaned.length() > 8000) {
-            log.warn("文本过长({}字符)，截断至8000字符", cleaned.length());
-            cleaned = cleaned.substring(0, 8000);
-        }
-        
-        return cleaned;
     }
 
     public int getTopK() {
